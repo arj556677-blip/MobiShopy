@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobiShopy — Supplier Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand gradient-text">📱 MobiShopy</div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="active"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="mobiles.html"><span class="nav-icon">📱</span> My Mobiles</a>
+      <a href="add_mobile.html"><span class="nav-icon">➕</span> Add Mobile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;" id="nav-user"></div>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" style="width:100%;">Logout</button>
+    </div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header">
+      <h1 id="welcome-msg">Supplier Dashboard</h1>
+      <p>Your listings and inventory overview</p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">📱</div><div class="stat-value" id="s-mobiles">—</div><div class="stat-label">Mobiles Listed</div></div>
+      <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-value" id="s-stock">—</div><div class="stat-label">Total Stock</div></div>
+      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-value" id="s-revenue">—</div><div class="stat-label">Total Revenue</div></div>
+    </div>
+
+    <div style="margin-bottom:2rem;">
+      <a href="add_mobile.html" class="btn btn-primary" style="font-size:1rem; padding:0.75rem 1.5rem;">➕ Add New Mobile</a>
+      <a href="mobiles.html" class="btn btn-secondary" style="font-size:1rem; padding:0.75rem 1.5rem; margin-left:0.5rem;">📱 Manage Listings</a>
+    </div>
+
+    <!-- My Mobiles Quick View -->
+    <div class="card">
+      <div class="card-header"><h2>My Mobile Listings</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Brand</th><th>Model</th><th>Price</th><th>Stock</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../js/api.js"></script><script src="../js/utils.js"></script>
+<script>
+  const user = session.require('supplier');
+  renderNavUser(); setupLogout(); preventBack();
+  document.getElementById('welcome-msg').textContent = `Welcome, ${user.name}! 🏭`;
+
+  async function load() {
+    const res = await api.get('mobile.php', { action: 'by_supplier', supplier_id: user.id });
+    const data = res.data || [];
+    document.getElementById('s-mobiles').textContent = data.length;
+    document.getElementById('s-stock').textContent   = data.reduce((s,m) => s + parseInt(m.stock), 0);
+
+    // Get revenue from sales summary
+    const r2 = await api.get('sales.php', { action: 'summary' });
+    const myMobileIds = new Set(data.map(m => m.mobile_id));
+    const revenue = (r2.data || []).filter(s => myMobileIds.has(parseInt(s.mobile_id))).reduce((s,d) => s + parseFloat(d.total_revenue), 0);
+    document.getElementById('s-revenue').textContent = formatCurrency(revenue);
+
+    const tbody = document.getElementById('tbody');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No listings yet. <a href="add_mobile.html">Add a mobile!</a></td></tr>'; return; }
+    tbody.innerHTML = data.map(m => `
+      <tr>
+        <td><strong>${m.brand}</strong></td>
+        <td>${m.model}</td>
+        <td>${formatCurrency(m.price)}</td>
+        <td>${stockBadge(m.stock)}</td>
+      </tr>`).join('');
+  }
+  load();
+</script>
+</body>
+</html>

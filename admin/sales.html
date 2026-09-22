@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobiShopy — Sales Report</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand gradient-text">📱 MobiShopy</div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="mobiles.html"><span class="nav-icon">📱</span> Mobiles</a>
+      <a href="customers.html"><span class="nav-icon">👥</span> Customers</a>
+      <a href="suppliers.html"><span class="nav-icon">🏭</span> Suppliers</a>
+      <a href="sales.html" class="active"><span class="nav-icon">📊</span> Sales</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;" id="nav-user"></div>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" style="width:100%;">Logout</button>
+    </div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header"><h1>Sales Report</h1><p>Mobile Sales Summary (from view)</p></div>
+
+    <!-- Mobile Sales Summary View -->
+    <div class="card mb-2">
+      <div class="card-header"><h2>📊 Mobile_Sales_Summary View</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Brand</th><th>Model</th><th>Price</th><th>Current Stock</th><th>Total Sold</th><th>Total Revenue</th></tr></thead>
+          <tbody id="tbody-summary"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- All Sales -->
+    <div class="card">
+      <div class="card-header flex justify-between align-center">
+        <h2>🧾 All Transactions</h2>
+        <input type="text" class="form-control" id="search" placeholder="Search…" style="max-width:220px;" />
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Customer</th><th>Mobile</th><th>Qty</th><th>Amount</th><th>Date</th><th>Warranty</th></tr></thead>
+          <tbody id="tbody-all"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../js/api.js"></script><script src="../js/utils.js"></script>
+<script>
+  session.require('admin'); renderNavUser(); setupLogout(); preventBack();
+  let allSales = [];
+
+  async function load() {
+    // Sales Summary View
+    const r1 = await api.get('sales.php', { action: 'summary' });
+    const tbs = document.getElementById('tbody-summary');
+    if (r1.status === 'success' && r1.data.length) {
+      tbs.innerHTML = r1.data.map(s => `
+        <tr>
+          <td><strong>${s.brand}</strong></td><td>${s.model}</td>
+          <td>${formatCurrency(s.price)}</td>
+          <td>${stockBadge(s.stock)}</td>
+          <td><strong>${s.total_qty_sold}</strong></td>
+          <td class="text-success"><strong>${formatCurrency(s.total_revenue)}</strong></td>
+        </tr>`).join('');
+    } else {
+      tbs.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No data.</td></tr>';
+    }
+
+    // All Sales
+    const r2 = await api.get('sales.php', { action: 'all' });
+    allSales = r2.data || [];
+    renderSales(allSales);
+  }
+
+  function renderSales(data) {
+    const tbody = document.getElementById('tbody-all');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No sales found.</td></tr>'; return; }
+    tbody.innerHTML = data.map(s => `
+      <tr>
+        <td>#${s.sales_id}</td><td>${s.customer_name}</td>
+        <td>${s.brand} ${s.model}</td><td>${s.quantity}</td>
+        <td class="text-success">${formatCurrency(s.amount)}</td>
+        <td>${formatDate(s.sales_date)}</td>
+        <td>${s.warranty ? `<span class="badge badge-success">${s.warranty}</span>` : '<span class="text-muted">—</span>'}</td>
+      </tr>`).join('');
+  }
+
+  document.getElementById('search').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    renderSales(allSales.filter(s => s.customer_name.toLowerCase().includes(q) || (s.brand + ' ' + s.model).toLowerCase().includes(q)));
+  });
+
+  load();
+</script>
+</body>
+</html>

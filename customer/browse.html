@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobiShopy — Browse Mobiles</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-brand gradient-text">📱 MobiShopy</div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html"><span class="nav-icon">🏠</span> Home</a>
+        <a href="browse.html" class="active"><span class="nav-icon">🛍️</span> Browse Mobiles</a>
+        <a href="history.html"><span class="nav-icon">🧾</span> My Orders</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;" id="nav-user"></div>
+        <button class="btn btn-secondary btn-sm" id="btn-logout" style="width:100%;">Logout</button>
+      </div>
+    </aside>
+    <main class="main-content">
+      <div class="page-header">
+        <h1>Browse Mobiles</h1>
+        <p>Find and buy your next smartphone</p>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-bar">
+        <input type="text" class="form-control" id="search" placeholder="Search brand or model…" />
+        <select class="form-control" id="brand-filter" style="max-width:180px;">
+          <option value="">All Brands</option>
+        </select>
+        <select class="form-control" id="sort" style="max-width:200px;">
+          <option value="brand">Sort by Brand</option>
+          <option value="price_asc">Price: Low → High</option>
+          <option value="price_desc">Price: High → Low</option>
+          <option value="stock">Stock</option>
+        </select>
+        <label
+          style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; color:var(--text-muted); cursor:pointer;">
+          <input type="checkbox" id="in-stock" /> In Stock Only
+        </label>
+      </div>
+
+      <div id="mobile-grid" class="mobiles-grid"></div>
+    </main>
+  </div>
+
+  <!-- Purchase Modal -->
+  <div class="modal-overlay" id="modal-buy">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('modal-buy')">✕</button>
+      <h2>Purchase Mobile</h2>
+      <div id="buy-info"
+        style="margin-bottom:1rem; padding:1rem; background:rgba(124,108,247,0.08); border-radius:8px; font-size:0.9rem;">
+      </div>
+      <form id="form-buy">
+        <div class="form-group">
+          <label>Quantity</label>
+          <input type="number" id="buy-qty" class="form-control" value="1" min="1" required />
+          <div id="buy-stock-info" style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;"></div>
+        </div>
+        <div class="form-group">
+          <label>Warranty Plan</label>
+          <select id="buy-warranty" class="form-control">
+            <option value="">1 Year Warranty</option>
+            <option value="2 Year Warranty">2 Year Warranty</option>
+          </select>
+        </div>
+        <div id="buy-total" style="font-size:1.1rem; font-weight:700; color:var(--success); margin-bottom:1rem;"></div>
+        <div class="flex gap-1">
+          <button type="submit" class="btn btn-primary" id="btn-confirm-buy">✅ Confirm Purchase</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-buy')">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bill Modal -->
+  <div class="modal-overlay" id="modal-bill">
+    <div class="modal modal-wide">
+      <button class="modal-close" onclick="closeModal('modal-bill')">✕</button>
+      <div id="bill-content"></div>
+      <div class="bill-actions">
+        <button class="btn btn-secondary" onclick="closeModal('modal-bill')">Close</button>
+        <button class="btn btn-primary" onclick="window.print()">🖨️ Print</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script>
+    const user = session.require('customer');
+    renderNavUser(); setupLogout(); preventBack();
+    let allMobiles = [];
+    let selectedMobile = null;
+
+    async function load() {
+      const res = await api.get('mobile.php', { action: 'list' });
+      allMobiles = res.data || [];
+
+      // Populate brand filter
+      const brands = [...new Set(allMobiles.map(m => m.brand))].sort();
+      const sel = document.getElementById('brand-filter');
+      brands.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; sel.appendChild(o); });
+
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const q = document.getElementById('search').value.toLowerCase();
+      const brand = document.getElementById('brand-filter').value;
+      const sort = document.getElementById('sort').value;
+      const stock = document.getElementById('in-stock').checked;
+
+      let data = allMobiles.filter(m => {
+        const matchQ = m.brand.toLowerCase().includes(q) || m.model.toLowerCase().includes(q);
+        const matchB = !brand || m.brand === brand;
+        const matchS = !stock || m.stock > 0;
+        return matchQ && matchB && matchS;
+      });
+
+      if (sort === 'price_asc') data.sort((a, b) => a.price - b.price);
+      if (sort === 'price_desc') data.sort((a, b) => b.price - a.price);
+      if (sort === 'stock') data.sort((a, b) => b.stock - a.stock);
+      if (sort === 'brand') data.sort((a, b) => a.brand.localeCompare(b.brand));
+
+      renderGrid(data);
+    }
+
+    function renderGrid(data) {
+      const grid = document.getElementById('mobile-grid');
+      if (!data.length) {
+        grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">📭</div><p>No mobiles found.</p></div>';
+        return;
+      }
+      grid.innerHTML = data.map(m => `
+      <div class="mobile-card" onclick="openBuy(${m.mobile_id})">
+        <div class="mobile-brand">${m.brand}</div>
+        <div class="mobile-model">${m.model}</div>
+        <div class="mobile-price">${formatCurrency(m.price)}</div>
+        <div class="mobile-stock">${stockBadge(m.stock)}</div>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.75rem;">by ${m.supplier_name}</div>
+        <button class="btn btn-primary btn-sm" style="width:100%;" ${m.stock === 0 ? 'disabled' : ''}>
+          ${m.stock === 0 ? 'Out of Stock' : '🛒 Buy Now'}
+        </button>
+      </div>`).join('');
+    }
+
+    ['search', 'brand-filter', 'sort', 'in-stock'].forEach(id => {
+      document.getElementById(id).addEventListener(id === 'in-stock' ? 'change' : 'input', applyFilters);
+    });
+
+    function openBuy(id) {
+      selectedMobile = allMobiles.find(m => m.mobile_id == id);
+      if (!selectedMobile || selectedMobile.stock === 0) return;
+      document.getElementById('buy-info').innerHTML = `
+      <strong>${selectedMobile.brand} ${selectedMobile.model}</strong><br/>
+      Price: <strong>${formatCurrency(selectedMobile.price)}</strong> per unit
+    `;
+      document.getElementById('buy-stock-info').textContent = `Available: ${selectedMobile.stock} units`;
+      document.getElementById('buy-qty').max = selectedMobile.stock;
+      document.getElementById('buy-qty').value = 1;
+      updateTotal();
+      openModal('modal-buy');
+    }
+
+    document.getElementById('buy-qty').addEventListener('input', updateTotal);
+    document.getElementById('buy-warranty').addEventListener('change', updateTotal);
+
+    function updateTotal() {
+      if (!selectedMobile) return;
+      const qty = parseInt(document.getElementById('buy-qty').value) || 1;
+      document.getElementById('buy-total').textContent = `Total: ${formatCurrency(selectedMobile.price * qty)}`;
+    }
+
+    document.getElementById('form-buy').addEventListener('submit', async e => {
+      e.preventDefault();
+      const qty = parseInt(document.getElementById('buy-qty').value);
+      const warranty = document.getElementById('buy-warranty').value || null;
+      const btn = document.getElementById('btn-confirm-buy');
+      btn.disabled = true; btn.textContent = 'Processing…';
+
+      const res = await api.post('sales.php', 'buy', {
+        customer_id: user.id,
+        mobile_id: selectedMobile.mobile_id,
+        quantity: qty,
+        warranty
+      });
+
+      btn.disabled = false; btn.textContent = '✅ Confirm Purchase';
+
+      if (res.status === 'success') {
+        closeModal('modal-buy');
+        showToast('Purchase successful! 🎉', 'success');
+        await showBill(res.sales_id);
+        load();
+      } else {
+        showToast(res.message, 'error');
+      }
+    });
+
+    async function showBill(sales_id) {
+      const r = await api.get('sales.php', { action: 'bill', id: sales_id });
+      if (r.status !== 'success') return;
+      const b = r.data;
+      document.getElementById('bill-content').innerHTML = `
+      <div class="bill-header">
+        <h2>📱 MobiShopy</h2>
+        <p>Mobile Shop Management System</p>
+        <p style="margin-top:0.25rem; font-size:0.75rem;">Bill #${b.sales_id} — ${formatDate(b.sales_date)}</p>
+      </div>
+      <div class="bill-row"><span>Customer</span><span>${b.customer_name}</span></div>
+      <div class="bill-row"><span>Phone</span><span>${b.phone}</span></div>
+      <div class="bill-row"><span>Mobile</span><span>${b.brand} ${b.model}</span></div>
+      <div class="bill-row"><span>Supplier</span><span>${b.supplier_name}</span></div>
+      <div class="bill-row"><span>Unit Price</span><span>${formatCurrency(b.unit_price)}</span></div>
+      <div class="bill-row"><span>Quantity</span><span>${b.quantity}</span></div>
+      <div class="bill-row"><span>Warranty</span><span>${b.warranty || '—'}</span></div>
+      <div class="bill-row bill-total"><span>Total Amount</span><span>${formatCurrency(b.amount)}</span></div>
+    `;
+      openModal('modal-bill');
+    }
+
+    load();
+  </script>
+</body>
+
+</html>

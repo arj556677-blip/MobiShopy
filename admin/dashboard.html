@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobiShopy — Admin Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand gradient-text">📱 MobiShopy</div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="active"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="mobiles.html"><span class="nav-icon">📱</span> Mobiles</a>
+      <a href="customers.html"><span class="nav-icon">👥</span> Customers</a>
+      <a href="suppliers.html"><span class="nav-icon">🏭</span> Suppliers</a>
+      <a href="sales.html"><span class="nav-icon">📊</span> Sales</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;" id="nav-user"></div>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" style="width:100%;">Logout</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content">
+    <div class="page-header">
+      <h1>Dashboard</h1>
+      <p>Overview of your mobile shop</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value" id="s-customers">—</div><div class="stat-label">Customers</div></div>
+      <div class="stat-card"><div class="stat-icon">🏭</div><div class="stat-value" id="s-suppliers">—</div><div class="stat-label">Suppliers</div></div>
+      <div class="stat-card"><div class="stat-icon">📱</div><div class="stat-value" id="s-mobiles">—</div><div class="stat-label">Mobiles Listed</div></div>
+      <div class="stat-card"><div class="stat-icon">🛒</div><div class="stat-value" id="s-sales">—</div><div class="stat-label">Total Sales</div></div>
+      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-value" id="s-revenue">—</div><div class="stat-label">Total Revenue</div></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>📦 Revenue by Supplier</h3>
+        <canvas id="chart-supplier" height="220"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>🔥 Top 5 Selling Mobiles</h3>
+        <canvas id="chart-mobiles" height="220"></canvas>
+      </div>
+    </div>
+
+    <!-- Recent Sales -->
+    <div class="card">
+      <div class="card-header"><h2>Recent Sales</h2></div>
+      <div class="table-wrap">
+        <table id="tbl-recent">
+          <thead><tr><th>#</th><th>Customer</th><th>Mobile</th><th>Qty</th><th>Amount</th><th>Date</th></tr></thead>
+          <tbody id="tbody-recent"><tr><td colspan="6" class="text-center text-muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+  const user = session.require('admin');
+  renderNavUser();
+  setupLogout();
+  preventBack();
+
+  async function loadDashboard() {
+    // Stats
+    const sRes = await api.get('admin.php', { action: 'stats' });
+    if (sRes.status === 'success') {
+      const d = sRes.data;
+      document.getElementById('s-customers').textContent = d.total_customers;
+      document.getElementById('s-suppliers').textContent = d.total_suppliers;
+      document.getElementById('s-mobiles').textContent   = d.total_mobiles;
+      document.getElementById('s-sales').textContent     = d.total_sales;
+      document.getElementById('s-revenue').textContent   = formatCurrency(d.total_revenue);
+    }
+
+    // Chart 1 — Revenue by Supplier
+    const r1 = await api.get('admin.php', { action: 'revenue_by_supplier' });
+    if (r1.status === 'success') {
+      const labels = r1.data.map(d => d.supplier_name);
+      const values = r1.data.map(d => parseFloat(d.total_revenue));
+      new Chart(document.getElementById('chart-supplier'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{ label: 'Revenue (₹)', data: values,
+            backgroundColor: ['#7c6cf7','#e879f9','#22d3a5','#f5a623','#f44336'],
+            borderRadius: 6 }]
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#8888aa' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { ticks: { color: '#8888aa', callback: v => '₹' + v.toLocaleString('en-IN') }, grid: { color: 'rgba(255,255,255,0.05)' } }
+          }
+        }
+      });
+    }
+
+    // Chart 2 — Top 5 Mobiles
+    const r2 = await api.get('admin.php', { action: 'top_mobiles' });
+    if (r2.status === 'success') {
+      const labels = r2.data.map(d => d.mobile_name);
+      const values = r2.data.map(d => parseInt(d.total_sold));
+      new Chart(document.getElementById('chart-mobiles'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{ label: 'Units Sold', data: values,
+            backgroundColor: '#7c6cf7', borderRadius: 6 }]
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#8888aa' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { ticks: { color: '#8888aa' }, grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    // Recent Sales
+    const r3 = await api.get('admin.php', { action: 'recent_sales' });
+    const tbody = document.getElementById('tbody-recent');
+    if (r3.status === 'success' && r3.data.length > 0) {
+      tbody.innerHTML = r3.data.map(s => `
+        <tr>
+          <td>#${s.sales_id}</td>
+          <td>${s.customer_name}</td>
+          <td>${s.brand} ${s.model}</td>
+          <td>${s.quantity}</td>
+          <td>${formatCurrency(s.amount)}</td>
+          <td>${formatDate(s.sales_date)}</td>
+        </tr>`).join('');
+    } else {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No sales yet.</td></tr>';
+    }
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>

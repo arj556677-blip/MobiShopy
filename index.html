@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobiShopy — Login</title>
+  <meta name="description" content="MobiShopy Mobile Shop Management System — Login to manage mobiles, customers and sales." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="auth-bg">
+    <div class="auth-card">
+      <div class="auth-logo gradient-text">📱 MobiShopy</div>
+      <p class="auth-subtitle">Mobile Shop Management System</p>
+
+      <!-- Role Tabs -->
+      <div class="role-tabs">
+        <button class="role-tab active" data-role="customer" id="tab-customer">Customer</button>
+        <button class="role-tab" data-role="supplier" id="tab-supplier">Supplier</button>
+        <button class="role-tab" data-role="admin"    id="tab-admin">Admin</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" class="form-control" placeholder="Enter username" required />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" class="form-control" placeholder="Enter password" required />
+        </div>
+        <div id="login-error" class="text-danger mt-1" style="font-size:0.85rem; min-height:1.2rem;"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:1rem;" id="btn-login">
+          Login
+        </button>
+      </form>
+
+      <p class="text-center mt-2" style="font-size:0.85rem; color:var(--text-muted);">
+        New customer or supplier?
+        <a href="register.html">Register here</a>
+      </p>
+
+      <!-- Demo credentials hint -->
+      <div style="margin-top:1.5rem; padding:1rem; background:rgba(124,108,247,0.08); border-radius:8px; border:1px solid rgba(124,108,247,0.2); font-size:0.78rem; color:var(--text-muted);">
+        <strong style="color:var(--primary);">Demo Accounts:</strong><br/>
+        Admin: admin / admin123<br/>
+        Customer: arjun_s / password<br/>
+        Supplier: samsung_sup / password
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    // If already logged in, redirect
+    const existing = session.get();
+    if (existing) {
+      redirectByRole(existing.role);
+    }
+
+    // Tab switching
+    const tabs = document.querySelectorAll('.role-tab');
+    let selectedRole = 'customer';
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        selectedRole = tab.dataset.role;
+      });
+    });
+
+    // Login submit
+    document.getElementById('login-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-login');
+      const errEl = document.getElementById('login-error');
+      btn.disabled = true;
+      btn.textContent = 'Logging in...';
+      errEl.textContent = '';
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await api.post('auth.php', 'login', { username, password, role: selectedRole });
+        if (res.status === 'success') {
+          session.save({ role: res.role, name: res.name, id: res.id || 0 });
+          redirectByRole(res.role);
+        } else {
+          errEl.textContent = res.message || 'Login failed.';
+          btn.disabled = false;
+          btn.textContent = 'Login';
+        }
+      } catch {
+        errEl.textContent = 'Server error. Is XAMPP running?';
+        btn.disabled = false;
+        btn.textContent = 'Login';
+      }
+    });
+
+    function redirectByRole(role) {
+      if (role === 'admin')         window.location.replace('admin/dashboard.html');
+      else if (role === 'customer') window.location.replace('customer/dashboard.html');
+      else if (role === 'supplier') window.location.replace('supplier/dashboard.html');
+    }
+  </script>
+</body>
+</html>

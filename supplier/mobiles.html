@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobiShopy — My Mobiles</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand gradient-text">📱 MobiShopy</div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="mobiles.html" class="active"><span class="nav-icon">📱</span> My Mobiles</a>
+      <a href="add_mobile.html"><span class="nav-icon">➕</span> Add Mobile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;" id="nav-user"></div>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" style="width:100%;">Logout</button>
+    </div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header flex justify-between align-center">
+      <div><h1>My Mobiles</h1><p>Manage your mobile listings</p></div>
+      <a href="add_mobile.html" class="btn btn-primary">➕ Add Mobile</a>
+    </div>
+    <div class="card">
+      <div class="filter-bar">
+        <input type="text" class="form-control" id="search" placeholder="Search model…" />
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Brand</th><th>Model</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-edit')">✕</button>
+    <h2>Edit Mobile</h2>
+    <form id="form-edit">
+      <input type="hidden" id="edit-id" />
+      <div class="form-group"><label>Brand</label><input type="text" id="edit-brand" class="form-control" required /></div>
+      <div class="form-group"><label>Model</label><input type="text" id="edit-model" class="form-control" required /></div>
+      <div class="form-group"><label>Price (₹)</label><input type="number" id="edit-price" class="form-control" step="0.01" min="1" required /></div>
+      <div class="form-group"><label>Stock</label><input type="number" id="edit-stock" class="form-control" min="0" required /></div>
+      <div class="flex gap-1 mt-2">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-edit')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="../js/api.js"></script><script src="../js/utils.js"></script>
+<script>
+  const user = session.require('supplier');
+  renderNavUser(); setupLogout(); preventBack();
+  let allData = [];
+
+  async function load() {
+    const res = await api.get('mobile.php', { action: 'by_supplier', supplier_id: user.id });
+    allData = res.data || [];
+    render(allData);
+  }
+
+  function render(data) {
+    const tbody = document.getElementById('tbody');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No mobiles listed. <a href="add_mobile.html">Add one!</a></td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(m => `
+      <tr>
+        <td>${m.mobile_id}</td>
+        <td><strong>${m.brand}</strong></td>
+        <td>${m.model}</td>
+        <td>${formatCurrency(m.price)}</td>
+        <td>${stockBadge(m.stock)}</td>
+        <td class="flex gap-1">
+          <button class="btn btn-secondary btn-sm" onclick='openEdit(${JSON.stringify(m)})'>Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteMobile(${m.mobile_id})">Delete</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  document.getElementById('search').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    render(allData.filter(m => m.model.toLowerCase().includes(q) || m.brand.toLowerCase().includes(q)));
+  });
+
+  function openEdit(m) {
+    document.getElementById('edit-id').value    = m.mobile_id;
+    document.getElementById('edit-brand').value = m.brand;
+    document.getElementById('edit-model').value = m.model;
+    document.getElementById('edit-price').value = m.price;
+    document.getElementById('edit-stock').value = m.stock;
+    openModal('modal-edit');
+  }
+
+  document.getElementById('form-edit').addEventListener('submit', async e => {
+    e.preventDefault();
+    const res = await api.post('mobile.php', 'update', {
+      mobile_id: document.getElementById('edit-id').value,
+      brand: document.getElementById('edit-brand').value,
+      model: document.getElementById('edit-model').value,
+      price: document.getElementById('edit-price').value,
+      stock: document.getElementById('edit-stock').value,
+    });
+    showToast(res.message, res.status === 'success' ? 'success' : 'error');
+    if (res.status === 'success') { closeModal('modal-edit'); load(); }
+  });
+
+  async function deleteMobile(id) {
+    if (!confirm('Delete this mobile listing?')) return;
+    const res = await api.get('mobile.php', { action: 'delete', id });
+    showToast(res.message, res.status === 'success' ? 'success' : 'error');
+    if (res.status === 'success') load();
+  }
+
+  load();
+</script>
+</body>
+</html>

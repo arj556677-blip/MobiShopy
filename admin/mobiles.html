@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobiShopy — All Mobiles (Admin)</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand gradient-text">📱 MobiShopy</div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="mobiles.html" class="active"><span class="nav-icon">📱</span> Mobiles</a>
+      <a href="customers.html"><span class="nav-icon">👥</span> Customers</a>
+      <a href="suppliers.html"><span class="nav-icon">🏭</span> Suppliers</a>
+      <a href="sales.html"><span class="nav-icon">📊</span> Sales</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;" id="nav-user"></div>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" style="width:100%;">Logout</button>
+    </div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header"><h1>All Mobiles</h1><p>Complete mobile inventory</p></div>
+    <div class="card">
+      <div class="filter-bar">
+        <input type="text" class="form-control" id="search" placeholder="Search brand or model…" />
+        <select class="form-control" id="sort" style="max-width:200px;">
+          <option value="brand">Sort by Brand</option>
+          <option value="price_asc">Price: Low → High</option>
+          <option value="price_desc">Price: High → Low</option>
+          <option value="stock">Stock</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Brand</th><th>Model</th><th>Price</th><th>Stock</th><th>Supplier</th><th>Action</th></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-edit')">✕</button>
+    <h2>Edit Mobile</h2>
+    <form id="form-edit">
+      <input type="hidden" id="edit-id" />
+      <div class="form-group"><label>Brand</label><input type="text" id="edit-brand" class="form-control" required /></div>
+      <div class="form-group"><label>Model</label><input type="text" id="edit-model" class="form-control" required /></div>
+      <div class="form-group"><label>Price (₹)</label><input type="number" id="edit-price" class="form-control" step="0.01" min="1" required /></div>
+      <div class="form-group"><label>Stock</label><input type="number" id="edit-stock" class="form-control" min="0" required /></div>
+      <div class="flex gap-1 mt-2">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-edit')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="../js/api.js"></script><script src="../js/utils.js"></script>
+<script>
+  session.require('admin'); renderNavUser(); setupLogout(); preventBack();
+  let allData = [];
+
+  async function load() {
+    const res = await api.get('mobile.php', { action: 'list' });
+    allData = res.data || [];
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const q    = document.getElementById('search').value.toLowerCase();
+    const sort = document.getElementById('sort').value;
+    let data = allData.filter(m => m.brand.toLowerCase().includes(q) || m.model.toLowerCase().includes(q));
+    if (sort === 'price_asc')  data.sort((a,b) => a.price - b.price);
+    if (sort === 'price_desc') data.sort((a,b) => b.price - a.price);
+    if (sort === 'stock')      data.sort((a,b) => b.stock - a.stock);
+    if (sort === 'brand')      data.sort((a,b) => a.brand.localeCompare(b.brand));
+    render(data);
+  }
+
+  function render(data) {
+    const tbody = document.getElementById('tbody');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No mobiles found.</td></tr>'; return; }
+    tbody.innerHTML = data.map(m => `
+      <tr>
+        <td>${m.mobile_id}</td>
+        <td><strong>${m.brand}</strong></td>
+        <td>${m.model}</td>
+        <td>${formatCurrency(m.price)}</td>
+        <td>${stockBadge(m.stock)}</td>
+        <td>${m.supplier_name}</td>
+        <td class="flex gap-1">
+          <button class="btn btn-secondary btn-sm" onclick='openEdit(${JSON.stringify(m)})'>Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteMobile(${m.mobile_id})">Delete</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  document.getElementById('search').addEventListener('input', applyFilters);
+  document.getElementById('sort').addEventListener('change', applyFilters);
+
+  function openEdit(m) {
+    document.getElementById('edit-id').value    = m.mobile_id;
+    document.getElementById('edit-brand').value = m.brand;
+    document.getElementById('edit-model').value = m.model;
+    document.getElementById('edit-price').value = m.price;
+    document.getElementById('edit-stock').value = m.stock;
+    openModal('modal-edit');
+  }
+
+  document.getElementById('form-edit').addEventListener('submit', async e => {
+    e.preventDefault();
+    const res = await api.post('mobile.php', 'update', {
+      mobile_id: document.getElementById('edit-id').value,
+      brand: document.getElementById('edit-brand').value,
+      model: document.getElementById('edit-model').value,
+      price: document.getElementById('edit-price').value,
+      stock: document.getElementById('edit-stock').value,
+    });
+    showToast(res.message, res.status === 'success' ? 'success' : 'error');
+    if (res.status === 'success') { closeModal('modal-edit'); load(); }
+  });
+
+  async function deleteMobile(id) {
+    if (!confirm('Delete this mobile?')) return;
+    const res = await api.get('mobile.php', { action: 'delete', id });
+    showToast(res.message, res.status === 'success' ? 'success' : 'error');
+    if (res.status === 'success') load();
+  }
+
+  load();
+</script>
+</body>
+</html>

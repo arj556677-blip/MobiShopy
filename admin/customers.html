@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobiShopy — Manage Customers</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand gradient-text">📱 MobiShopy</div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="mobiles.html"><span class="nav-icon">📱</span> Mobiles</a>
+      <a href="customers.html" class="active"><span class="nav-icon">👥</span> Customers</a>
+      <a href="suppliers.html"><span class="nav-icon">🏭</span> Suppliers</a>
+      <a href="sales.html"><span class="nav-icon">📊</span> Sales</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;" id="nav-user"></div>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" style="width:100%;">Logout</button>
+    </div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header"><h1>Customers</h1><p>All registered customers</p></div>
+    <div class="card">
+      <div class="filter-bar">
+        <input type="text" class="form-control" id="search" placeholder="Search by name or phone…" />
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Address</th><th>Username</th><th>Action</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../js/api.js"></script><script src="../js/utils.js"></script>
+<script>
+  session.require('admin'); renderNavUser(); setupLogout(); preventBack();
+  let allData = [];
+
+  async function load() {
+    const res = await api.get('customer.php', { action: 'list' });
+    allData = res.data || [];
+    render(allData);
+  }
+
+  function render(data) {
+    const tbody = document.getElementById('tbody');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No customers found.</td></tr>'; return; }
+    tbody.innerHTML = data.map(c => `
+      <tr>
+        <td>${c.customer_id}</td>
+        <td>${c.customer_name}</td>
+        <td>${c.phone}</td>
+        <td>${c.address}</td>
+        <td><span class="badge badge-primary">${c.username}</span></td>
+        <td>
+          <button class="btn btn-danger btn-sm" onclick="deleteCustomer(${c.customer_id}, '${c.customer_name}')">Delete</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  document.getElementById('search').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    render(allData.filter(c => c.customer_name.toLowerCase().includes(q) || c.phone.includes(q)));
+  });
+
+  async function deleteCustomer(id, name) {
+    if (!confirm(`Delete customer "${name}"?`)) return;
+    const res = await api.get('customer.php', { action: 'delete', id });
+    showToast(res.message, res.status === 'success' ? 'success' : 'error');
+    if (res.status === 'success') load();
+  }
+
+  load();
+</script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobiShopy — My Orders</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand gradient-text">📱 MobiShopy</div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"><span class="nav-icon">🏠</span> Home</a>
+      <a href="browse.html"><span class="nav-icon">🛍️</span> Browse Mobiles</a>
+      <a href="history.html" class="active"><span class="nav-icon">🧾</span> My Orders</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;" id="nav-user"></div>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" style="width:100%;">Logout</button>
+    </div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header"><h1>My Orders</h1><p>Your complete purchase history</p></div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Mobile</th><th>Qty</th><th>Unit Price</th><th>Amount</th><th>Date</th><th>Warranty</th><th>Bill</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Bill Modal -->
+<div class="modal-overlay" id="modal-bill">
+  <div class="modal modal-wide">
+    <button class="modal-close" onclick="closeModal('modal-bill')">✕</button>
+    <div id="bill-content"></div>
+    <div class="bill-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-bill')">Close</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Print</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script><script src="../js/utils.js"></script>
+<script>
+  const user = session.require('customer');
+  renderNavUser(); setupLogout(); preventBack();
+
+  async function load() {
+    const res = await api.get('sales.php', { action: 'history', customer_id: user.id });
+    const data = res.data || [];
+    const tbody = document.getElementById('tbody');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No orders yet. <a href="browse.html">Browse mobiles!</a></td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(s => `
+      <tr>
+        <td>#${s.sales_id}</td>
+        <td><strong>${s.brand}</strong> ${s.model}</td>
+        <td>${s.quantity}</td>
+        <td>${formatCurrency(s.unit_price)}</td>
+        <td class="text-success"><strong>${formatCurrency(s.amount)}</strong></td>
+        <td>${formatDate(s.sales_date)}</td>
+        <td>${s.warranty ? `<span class="badge badge-success" style="font-size:0.7rem;">${s.warranty}</span>` : '<span class="text-muted">—</span>'}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="showBill(${s.sales_id})">🧾 Bill</button></td>
+      </tr>`).join('');
+  }
+
+  async function showBill(sales_id) {
+    const r = await api.get('sales.php', { action: 'bill', id: sales_id });
+    if (r.status !== 'success') return;
+    const b = r.data;
+    document.getElementById('bill-content').innerHTML = `
+      <div class="bill-header">
+        <h2>📱 MobiShopy</h2>
+        <p>Mobile Shop Management System</p>
+        <p style="margin-top:0.25rem; font-size:0.75rem;">Bill #${b.sales_id} — ${formatDate(b.sales_date)}</p>
+      </div>
+      <div class="bill-row"><span>Customer</span><span>${b.customer_name}</span></div>
+      <div class="bill-row"><span>Phone</span><span>${b.phone}</span></div>
+      <div class="bill-row"><span>Address</span><span>${b.address}</span></div>
+      <div class="bill-row"><span>Mobile</span><span>${b.brand} ${b.model}</span></div>
+      <div class="bill-row"><span>Supplier</span><span>${b.supplier_name}</span></div>
+      <div class="bill-row"><span>Unit Price</span><span>${formatCurrency(b.unit_price)}</span></div>
+      <div class="bill-row"><span>Quantity</span><span>${b.quantity}</span></div>
+      <div class="bill-row"><span>Warranty</span><span>${b.warranty || '—'}</span></div>
+      <div class="bill-row bill-total"><span>Total Amount</span><span>${formatCurrency(b.amount)}</span></div>
+    `;
+    openModal('modal-bill');
+  }
+
+  load();
+</script>
+</body>
+</html>

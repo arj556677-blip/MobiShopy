@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobiShopy — Add Mobile</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand gradient-text">📱 MobiShopy</div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="mobiles.html"><span class="nav-icon">📱</span> My Mobiles</a>
+      <a href="add_mobile.html" class="active"><span class="nav-icon">➕</span> Add Mobile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;" id="nav-user"></div>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" style="width:100%;">Logout</button>
+    </div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header"><h1>Add New Mobile</h1><p>List a new mobile in the shop</p></div>
+    <div class="card" style="max-width:500px;">
+      <form id="form-add">
+        <div class="form-group">
+          <label>Brand</label>
+          <input type="text" class="form-control" id="brand" placeholder="e.g. Samsung" required />
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <input type="text" class="form-control" id="model" placeholder="e.g. Galaxy S25" required />
+        </div>
+        <div class="form-group">
+          <label>Price (₹)</label>
+          <input type="number" class="form-control" id="price" placeholder="e.g. 49999" step="0.01" min="1" required />
+        </div>
+        <div class="form-group">
+          <label>Initial Stock</label>
+          <input type="number" class="form-control" id="stock" placeholder="e.g. 20" min="0" required />
+        </div>
+        <div id="form-msg" style="font-size:0.85rem; min-height:1.2rem; margin-bottom:0.5rem;"></div>
+        <div class="flex gap-1">
+          <button type="submit" class="btn btn-primary" id="btn-add">➕ Add Mobile</button>
+          <a href="mobiles.html" class="btn btn-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+<script src="../js/api.js"></script><script src="../js/utils.js"></script>
+<script>
+  const user = session.require('supplier');
+  renderNavUser(); setupLogout(); preventBack();
+
+  document.getElementById('form-add').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn    = document.getElementById('btn-add');
+    const msgEl  = document.getElementById('form-msg');
+    btn.disabled = true; btn.textContent = 'Adding…';
+    msgEl.textContent = '';
+
+    const res = await api.post('mobile.php', 'add', {
+      supplier_id: user.id,
+      brand: document.getElementById('brand').value.trim(),
+      model: document.getElementById('model').value.trim(),
+      price: parseFloat(document.getElementById('price').value),
+      stock: parseInt(document.getElementById('stock').value),
+    });
+
+    btn.disabled = false; btn.textContent = '➕ Add Mobile';
+
+    if (res.status === 'success') {
+      showToast('Mobile added successfully! 🎉', 'success');
+      msgEl.style.color = 'var(--success)';
+      msgEl.textContent = 'Mobile listed successfully!';
+      document.getElementById('form-add').reset();
+    } else {
+      msgEl.style.color = 'var(--danger)';
+      msgEl.textContent = res.message;
+      showToast(res.message, 'error');
+    }
+  });
+</script>
+</body>
+</html>

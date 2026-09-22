@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobiShopy — Register</title>
+  <meta name="description" content="Create a new Customer or Supplier account on MobiShopy." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="auth-bg">
+    <div class="auth-card" style="max-width:460px;">
+      <div class="auth-logo gradient-text">📱 MobiShopy</div>
+      <p class="auth-subtitle">Create a new account</p>
+
+      <!-- Role Tabs -->
+      <div class="role-tabs">
+        <button class="role-tab active" data-role="customer" id="tab-customer">Customer</button>
+        <button class="role-tab" data-role="supplier" id="tab-supplier">Supplier</button>
+      </div>
+
+      <!-- Customer Registration Form -->
+      <form id="form-customer">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" class="form-control" name="name" placeholder="e.g. Arjun Sharma" required />
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <input type="text" class="form-control" name="address" placeholder="Your address" required />
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" class="form-control" name="phone" placeholder="10-digit mobile number" maxlength="15" required />
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" class="form-control" name="username" placeholder="Choose a username" required />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" class="form-control" name="password" placeholder="Min 6 characters" minlength="6" required />
+        </div>
+        <div id="err-customer" class="text-danger mt-1" style="font-size:0.85rem; min-height:1.2rem;"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:1rem;">Register as Customer</button>
+      </form>
+
+      <!-- Supplier Registration Form -->
+      <form id="form-supplier" style="display:none;">
+        <div class="form-group">
+          <label>Company / Supplier Name</label>
+          <input type="text" class="form-control" name="name" placeholder="e.g. Samsung India Pvt Ltd" required />
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" class="form-control" name="phone" placeholder="10-digit mobile number" maxlength="15" required />
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" class="form-control" name="username" placeholder="Choose a username" required />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" class="form-control" name="password" placeholder="Min 6 characters" minlength="6" required />
+        </div>
+        <div id="err-supplier" class="text-danger mt-1" style="font-size:0.85rem; min-height:1.2rem;"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:1rem;">Register as Supplier</button>
+      </form>
+
+      <p class="text-center mt-2" style="font-size:0.85rem; color:var(--text-muted);">
+        Already have an account? <a href="index.html">Login here</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    const tabs = document.querySelectorAll('.role-tab');
+    let selectedRole = 'customer';
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        selectedRole = tab.dataset.role;
+        document.getElementById('form-customer').style.display = selectedRole === 'customer' ? '' : 'none';
+        document.getElementById('form-supplier').style.display = selectedRole === 'supplier' ? '' : 'none';
+      });
+    });
+
+    async function handleRegister(form, role) {
+      form.addEventListener('submit', async e => {
+        e.preventDefault();
+        const errEl = document.getElementById(`err-${role}`);
+        errEl.textContent = '';
+        const fd = new FormData(form);
+        const body = Object.fromEntries(fd.entries());
+        body.role = role;
+
+        try {
+          const res = await api.post('auth.php', 'register', body);
+          if (res.status === 'success') {
+            showToast('Registered! Please login.', 'success');
+            setTimeout(() => window.location.href = 'index.html', 1500);
+          } else {
+            errEl.textContent = res.message;
+          }
+        } catch {
+          errEl.textContent = 'Server error. Is XAMPP running?';
+        }
+      });
+    }
+
+    handleRegister(document.getElementById('form-customer'), 'customer');
+    handleRegister(document.getElementById('form-supplier'), 'supplier');
+  </script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobiShopy — Customer Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand gradient-text">📱 MobiShopy</div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="active"><span class="nav-icon">🏠</span> Home</a>
+      <a href="browse.html"><span class="nav-icon">🛍️</span> Browse Mobiles</a>
+      <a href="history.html"><span class="nav-icon">🧾</span> My Orders</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;" id="nav-user"></div>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" style="width:100%;">Logout</button>
+    </div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header">
+      <h1 id="welcome-msg">Welcome!</h1>
+      <p>Your MobiShopy account overview</p>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">🛒</div><div class="stat-value" id="s-orders">—</div><div class="stat-label">Total Orders</div></div>
+      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-value" id="s-spent">—</div><div class="stat-label">Total Spent</div></div>
+      <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-value" id="s-units">—</div><div class="stat-label">Units Purchased</div></div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:2rem;">
+      <a href="browse.html" class="btn btn-primary" style="font-size:1rem; padding:0.75rem 1.5rem;">🛍️ Browse Mobiles</a>
+      <a href="history.html" class="btn btn-secondary" style="font-size:1rem; padding:0.75rem 1.5rem;">🧾 View My Orders</a>
+    </div>
+
+    <!-- Recent Orders -->
+    <div class="card">
+      <div class="card-header"><h2>Recent Orders</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Mobile</th><th>Qty</th><th>Amount</th><th>Date</th></tr></thead>
+          <tbody id="tbody-recent"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../js/api.js"></script><script src="../js/utils.js"></script>
+<script>
+  const user = session.require('customer');
+  renderNavUser();
+  setupLogout();
+  preventBack();
+  document.getElementById('welcome-msg').textContent = `Welcome, ${user.name}! 👋`;
+
+  async function load() {
+    const res = await api.get('sales.php', { action: 'history', customer_id: user.id });
+    const data = res.data || [];
+    document.getElementById('s-orders').textContent = data.length;
+    document.getElementById('s-spent').textContent  = formatCurrency(data.reduce((s,d) => s + parseFloat(d.amount), 0));
+    document.getElementById('s-units').textContent  = data.reduce((s,d) => s + parseInt(d.quantity), 0);
+
+    const tbody = document.getElementById('tbody-recent');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No orders yet. <a href="browse.html">Browse mobiles!</a></td></tr>'; return; }
+    tbody.innerHTML = data.slice(0, 5).map(s => `
+      <tr>
+        <td>#${s.sales_id}</td>
+        <td>${s.brand} ${s.model}</td>
+        <td>${s.quantity}</td>
+        <td class="text-success">${formatCurrency(s.amount)}</td>
+        <td>${formatDate(s.sales_date)}</td>
+      </tr>`).join('');
+  }
+  load();
+</script>
+</body>
+</html>
